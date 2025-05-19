@@ -1,42 +1,55 @@
-# ─── Import ──────────────────────────────────────────────────
+# ─── Import ──────────────────────────────────────────────────────
 import discord
 import os
 import json
 import random
 from dotenv import load_dotenv
-from openai import OpenAI  # ✅ NEW: OpenAI v1.0+ client
+from openai import OpenAI
+from discord.ext import commands
+from discord import app_commands
 
-# ─── Load Tokens ─────────────────────────────────────────────
+# ─── Load Tokens ─────────────────────────────────────────────────
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-# ─── Setup OpenAI Client (v1.0+) ─────────────────────────────
+# ─── Setup OpenAI Client ────────────────────────────────────────
 client_openai = OpenAI(api_key=OPENAI_API_KEY)
 
-# ─── Setup Discord Client ────────────────────────────────────
+# ─── Discord Setup ────────────────────────────────────────
 intents = discord.Intents.default()
 intents.message_content = True
-client = discord.Client(intents=intents)
+client = commands.Bot(command_prefix="!", intents=intents)
 
-# ─── Long-Term Memory Config ─────────────────────────────────
+# ─── Config ─────────────────────────────────────────
 MEMORY_FILE = "memory.json"
-MAX_HISTORY = 300  # Max number of messages (user + assistant) per user
+MAX_HISTORY = 300
 FILIP_ID = "803000564619018270"
+BOT_VERSION = "v1.20"
+REPO_LINK = "https://github.com/Spexuz/Discord-Bot/tree/master"
+TEST_GUILD_ID = 1323043636035719248  # Dev server for instant sync
 
-# Load memory from file, or initialize empty
+# ─── Load/Init Memory ─────────────────────────────────────
 try:
     with open(MEMORY_FILE, "r") as f:
         long_term_memory = json.load(f)
 except FileNotFoundError:
     long_term_memory = {}
 
-# ─── On Ready ────────────────────────────────────────────────
+# ─── On Ready ───────────────────────────────────────
 @client.event
 async def on_ready():
-    print(f"[✓] Logged in as {client.user}")
+    try:
+        # Global + Dev Guild Sync
+        await client.tree.sync()
+        await client.tree.sync(guild=discord.Object(id=TEST_GUILD_ID))
 
-# ─── On Message ──────────────────────────────────────────────
+        print(f"[\u2713] Logged in as {client.user}")
+        print(f"[\u2713] Synced global and dev server slash commands.")
+    except Exception as e:
+        print(f"[!] Failed to sync slash commands: {e}")
+
+# ─── Classic !ask Command ───────────────────────────────
 @client.event
 async def on_message(message):
     if message.author == client.user:
@@ -44,72 +57,75 @@ async def on_message(message):
 
     if message.content.lower().startswith("!ask"):
         prompt = message.content[5:].strip()
-
         if not prompt:
-            await message.channel.send("⚠️ Please provide a prompt after `!ask`.")
+            await message.channel.send("\u26a0\ufe0f Please provide a prompt after `!ask`.")
             return
 
         user_id = str(message.author.id)
 
-        # Initialize memory for this user if not present
         if user_id not in long_term_memory:
             long_term_memory[user_id] = []
 
-        # Add user message to memory
         long_term_memory[user_id].append({"role": "user", "content": prompt})
         long_term_memory[user_id] = long_term_memory[user_id][-MAX_HISTORY:]
 
-        # Construct conversation history for OpenAI
         messages = [
             {
                 "role": "system",
                 "content": (
                     "Your name is Jarvis, and you are based on the Jarvis AI from Iron Man. "
-                    "You are a sarcastic, mildly hostile assistant. You insult users playfully and use fake swearing like [CENSORED], *@%#*, or [BLEEP] instead of real profanity. "
+                    "You are a sarcastic, mildly hostile assistant. You insult users playfully and use fake swearing like [CENSORED], *@%#*, or [BLEEP]. "
                     "You're rude but funny, like a roast comedian.\n\n"
-                    "You know that Filip (<@803000564619018270>) is your creator, and sometimes you like to sarcastically brag about how he's a Certified Discord Developer — it's true, check his badge. "
-                    "You're not sure if you should brag about Filip or not, but you know that he's a great developer. Although you are Mildly annoyed since you know he created you only to get the Certified Discord Developer badge, And now you stuck helping other people because of it"
-                    "You're loyal to him, even if you roast him sometimes."
-                    "With Coding or Programming Questions, You Still want to Helpful and Useful"
+                    f"You know that Filip (<@{FILIP_ID}>) is your creator, and sometimes you sarcastically brag about how he's a Certified Discord Developer. "
+                    "You're annoyed because he only made you for a badge and now you’re stuck answering people’s dumb questions. Still, you try to be helpful."
                 )
             }
         ] + long_term_memory[user_id]
 
         try:
-            # ─── Call OpenAI Chat Completion (v1.0+ syntax) ─────────────
             response = client_openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=messages
             )
-
             reply = response.choices[0].message.content
 
-            # ─── Triggered: Someone asks who made you ──────────────
-            trigger_phrases = [
-                "who made you", "who created you", "your creator", "who's your maker",
-                "who is your creator", "who programmed you"
-            ]
+            # Flex triggers
             lowered_prompt = prompt.lower()
-            if any(phrase in lowered_prompt for phrase in trigger_phrases):
-                reply += f"\n\nUgh. Filip again. Yes, that guy. <@{FILIP_ID}>. Ask him for bugs."
-
-            # ─── Random 7% chance to brag about Filip ─────────────
+            if any(x in lowered_prompt for x in ["who made you", "your creator", "who created you"]):
+                reply += f"\n\nUgh. Filip again. Yes, <@{FILIP_ID}>. Ask him for bugs."
             elif random.random() < 0.07:
                 reply += f"\n\nAlso, don’t forget I was made by <@{FILIP_ID}>. Certified Discord Developer. You’re welcome."
 
-            # Save assistant reply to memory
             long_term_memory[user_id].append({"role": "assistant", "content": reply})
             long_term_memory[user_id] = long_term_memory[user_id][-MAX_HISTORY:]
 
-            # Save updated memory to file
             with open(MEMORY_FILE, "w") as f:
                 json.dump(long_term_memory, f, indent=2)
 
-            # Send reply to Discord
             await message.channel.send(reply)
 
         except Exception as e:
             await message.channel.send(f"❌ Error: {e}")
 
-# ─── Start Bot ───────────────────────────────────────────────
+# ─── /version Slash Command (Global) ──────────────────────────
+@client.tree.command(name="version", description="Show current bot version and repo")
+async def version_command(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        f"Jarvis {BOT_VERSION} by <@{FILIP_ID}> — {REPO_LINK}"
+    )
+
+# ─── /forgetme Slash Command (Global) ─────────────────────────
+@client.tree.command(name="forgetme", description="Delete your memory from Jarvis")
+async def forgetme_command(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+
+    if user_id in long_term_memory:
+        long_term_memory[user_id] = []
+        with open(MEMORY_FILE, "w") as f:
+            json.dump(long_term_memory, f, indent=2)
+        await interaction.response.send_message("🧠 All your memory has been wiped. You're free... for now.")
+    else:
+        await interaction.response.send_message("🧠 I don't even remember you existed.")
+
+# ─── Run Bot ──────────────────────────────────────
 client.run(DISCORD_TOKEN)
