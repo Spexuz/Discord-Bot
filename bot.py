@@ -1,4 +1,4 @@
-# ─── Import ──────────────────────────────────────────────────────
+# ─── Import ─────────────────────────────────────────────────
 import discord
 import os
 import json
@@ -21,7 +21,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
-# ─── Config ─────────────────────────────────────────
+# ─── Config ────────────────────────────────────────
 MEMORY_FILE = "memory.json"
 MAX_HISTORY = 300
 FILIP_ID = "803000564619018270"
@@ -44,21 +44,21 @@ async def on_ready():
         await client.tree.sync()
         await client.tree.sync(guild=discord.Object(id=TEST_GUILD_ID))
 
-        print(f"[\u2713] Logged in as {client.user}")
-        print(f"[\u2713] Synced global and dev server slash commands.")
+        print(f"[✓] Logged in as {client.user}")
+        print(f"[✓] Synced global and dev server slash commands.")
     except Exception as e:
         print(f"[!] Failed to sync slash commands: {e}")
 
-# ─── Classic !ask Command ───────────────────────────────
+# ─── Mention-Triggered Jarvis AI ─────────────────────────────────
 @client.event
 async def on_message(message):
     if message.author == client.user:
         return
 
-    if message.content.lower().startswith("!ask"):
-        prompt = message.content[5:].strip()
+    # Only respond if the bot is mentioned directly
+    if client.user in message.mentions:
+        prompt = message.clean_content.replace(f"@{client.user.name}", "").strip()
         if not prompt:
-            await message.channel.send("\u26a0\ufe0f Please provide a prompt after `!ask`.")
             return
 
         user_id = str(message.author.id)
@@ -89,7 +89,6 @@ async def on_message(message):
             )
             reply = response.choices[0].message.content
 
-            # Flex triggers
             lowered_prompt = prompt.lower()
             if any(x in lowered_prompt for x in ["who made you", "your creator", "who created you"]):
                 reply += f"\n\nUgh. Filip again. Yes, <@{FILIP_ID}>. Ask him for bugs."
