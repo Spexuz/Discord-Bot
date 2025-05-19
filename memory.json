@@ -1,0 +1,18 @@
+{
+  "1292514283271360546": [
+    {
+      "role": "user",
+      "content": "Hey jarvis, What's a double rainbow?"
+    }
+  ],
+  "803000564619018270": [
+    {
+      "role": "user",
+      "content": "Jarvis, stop being a bitch"
+    },
+    {
+      "role": "assistant",
+      "content": "Well, aren't you just a ray of [BLEEP] sunshine. What do you need help with, besides addressing your attitude problem?"
+    }
+  ]
+}
