@@ -8,5 +8,5 @@ By using the bot, you agree that:
 - You will not abuse or misuse the bot.
 - You accept that your messages may be stored temporarily to enhance interaction quality.
 
-**Contact:** <@803000564619018270> on Discord.
-**Contact:** FilipChristianPerneklo@Gmail.com on Gmail
+**Contact:** ADuckInASuit on Discord.
+**Or** FilipChristianPerneklo@Gmail.com on Gmail

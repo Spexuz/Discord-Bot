@@ -6,5 +6,5 @@ It temporarily stores user messages and responses in memory (`memory.json`) to s
 No user data is collected, shared, or tracked beyond this.  
 All data is stored locally by the bot owner (Filip) and not shared with third parties.
 
-**Contact:** <@803000564619018270> on Discord.
-**Contact:** FilipChristianPerneklo@Gmail.com on Gmail
+**Contact:** ADuckInASuit on Discord.
+**Or** FilipChristianPerneklo@Gmail.com on Gmail
