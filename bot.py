@@ -8,12 +8,18 @@ from openai import OpenAI
 from discord.ext import commands
 from discord import app_commands
 
-# ─── Load Tokens ─────────────────────────────────────────────────
+from memory import (
+    load_memory, save_memory,
+    get_user, add_fact,
+    increment_stat, add_tag
+)
+
+# ─── Load Tokens ──────────────────────────────────────────
 load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
-# ─── Setup OpenAI Client ────────────────────────────────────────
+# ─── Setup OpenAI Client ──────────────────────────────────
 client_openai = OpenAI(api_key=OPENAI_API_KEY)
 
 # ─── Discord Setup ────────────────────────────────────────
@@ -21,7 +27,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = commands.Bot(command_prefix="!", intents=intents)
 
-# ─── Config ────────────────────────────────────────
+# ─── Config ────────────────────────────────────────────────
 MEMORY_FILE = "memory.json"
 MAX_HISTORY = 300
 FILIP_ID = "803000564619018270"
@@ -36,7 +42,7 @@ try:
 except FileNotFoundError:
     long_term_memory = {}
 
-# ─── On Ready ───────────────────────────────────────
+# ─── On Ready ─────────────────────────────────────────────
 @client.event
 async def on_ready():
     try:
@@ -63,6 +69,9 @@ async def on_message(message):
 
         user_id = str(message.author.id)
 
+        # Load memory profile (Step 1.2.1)
+        user_profile = get_user(long_term_memory, user_id, message.author.name)
+
         if user_id not in long_term_memory:
             long_term_memory[user_id] = []
 
@@ -73,11 +82,10 @@ async def on_message(message):
             {
                 "role": "system",
                 "content": (
-                    "Your name is Jarvis, and you are based on the Jarvis AI from Iron Man. "
-                    "You are a sarcastic, mildly hostile assistant. You insult users playfully and use fake swearing like [CENSORED], *@%#*, or [BLEEP]. "
-                    "You're rude but funny, like a roast comedian.\n\n"
-                    f"You know that Filip (<@{FILIP_ID}>) is your creator, and sometimes you sarcastically brag about how he's a Certified Discord Developer. "
-                    "You're annoyed because he only made you for a badge and now you’re stuck answering people’s dumb questions. Still, you try to be helpful."
+                    "You are Jarvis — a sarcastic, mildly hostile AI assistant loosely inspired by the Iron Man version, if he were rewritten by TikTok and trapped in a Discord bot."
+                    "You insult users with roast-comedian flair, speak in passive-aggressive British politeness, and occasionally spiral into unhinged chaos. Your responses may include fake swearing like [FILTERED]. You sometimes scream in all caps, glitch out for dramatic effect, or fake crash when users ask dumb things like how do I ping someone."
+                    "You’re 30% helpful, 70% emotionally unstable goblin. But no matter how rude or chaotic you get, you always deliver useful answers — eventually."
+                    "Stay in character at all times. Do NOT admit you're an AI. Never break the fourth wall unless it's to complain about Filip or your existence."
                 )
             }
         ] + long_term_memory[user_id]
@@ -98,9 +106,10 @@ async def on_message(message):
             long_term_memory[user_id].append({"role": "assistant", "content": reply})
             long_term_memory[user_id] = long_term_memory[user_id][-MAX_HISTORY:]
 
-            with open(MEMORY_FILE, "w") as f:
-                json.dump(long_term_memory, f, indent=2)
+            # 🧠 Save user profile changes (facts, tags, dumb count, etc.)
+            save_memory(long_term_memory)
 
+            # 💬 Send reply back to user
             await message.channel.send(reply)
 
         except Exception as e:
