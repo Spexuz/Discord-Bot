@@ -21,6 +21,7 @@ from memory import (
 from memory_chat import (
     load_chat_history, save_chat_history, append_message
 )
+from code_analyzer import analyze_code
 
 # ─── Load Tokens ──────────────────────────────────────────
 load_dotenv()
@@ -47,20 +48,26 @@ TEST_GUILD_ID = 1323043636035719248
 long_term_memory = load_memory()
 chat_history = load_chat_history()
 
-# ─── On Ready: Sync Commands ───────────────────────────────
-@client.event
-async def on_ready():
-    try:
-        await client.tree.sync()
-        await client.tree.sync(guild=discord.Object(id=TEST_GUILD_ID))
-        print(f"[✓] Logged in as {client.user}")
-        print(f"[✓] Synced global and dev server slash commands.")
-    except Exception as e:
-        print(f"[!] Slash sync failed: {e}")
+# ─── Async GPT Call Wrapper ───────────────────────────────
+import asyncio
+import concurrent.futures
+
+async def ask_openai_async(model, messages):
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(
+            pool,
+            lambda: client_openai.chat.completions.create(
+                model=model,
+                messages=messages
+            )
+        )
 
 # ─── Jarvis AI Trigger ─────────────────────────────────────
 @client.event
 async def on_message(message):
+    ...
+
     if message.author == client.user:
         return
 
@@ -78,12 +85,45 @@ async def on_message(message):
         messages = [
             {"role": "system", "content": generate_personality_prompt(user_id, long_term_memory)}
         ] + chat_history.get(user_id, [])
+        print(f"[DEBUG] Total message history length: {len(messages)}")
+
+        # ─── Inject code context if prompt sounds dev-related ───────
+        dev_keywords = ["why", "how", "forget", "memory", "tag", "explain", "code", "logic", "function"]
+        lowered = prompt.lower()
+        matched = [word for word in dev_keywords if word in lowered]
+        print(f"[DEBUG] Prompt keywords matched: {matched}")
+
+        if matched:
+            print("[DEBUG] Calling analyze_code()...")
+            possible_context = analyze_code(prompt)
+
+            # TEMP fallback test (force context for debug)
+            if not possible_context.strip():
+                possible_context = "def add_tag(memory, user_id, tag):\n    # stores user tags in a dictionary. Blame Filip if it fails."
+
+            print(f"[DEBUG] Context length: {len(possible_context)}")
+
+            injected_context = (
+                "As a dev-aware AI, here's your code context to reflect on before you answer:\n\n"
+                f"{possible_context}"
+            )
+
+            messages.insert(1, {
+                "role": "user",
+                "content": injected_context
+            })
 
         try:
-            response = client_openai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages
-            )
+            # ─── Choose Model Based on Prompt Intent ───────────────────────
+            lowered = prompt.lower()
+            dev_keywords = ["why", "how", "forget", "memory", "tag", "explain", "code", "logic", "function"]
+            use_gpt4 = any(word in lowered for word in dev_keywords)
+            print(f"[DEBUG] Prompt keywords matched: {[word for word in dev_keywords if word in lowered]}")
+            chosen_model = "gpt-4" if use_gpt4 else "gpt-3.5-turbo"
+
+            # ─── GPT Call ──────────────────────────────────────────────────
+            response = await ask_openai_async(chosen_model, messages)
+
             reply = response.choices[0].message.content
 
             # ─── Live Tone Shaping ─────────────────────────────

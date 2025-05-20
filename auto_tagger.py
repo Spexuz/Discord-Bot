@@ -20,7 +20,7 @@ def auto_tag_user(memory, user_id, message_content):
             add_tag(memory, user_id, "annoying")
 
     # —— Respect Recognition ——
-    if any(x in lowered for x in ["thank you", "that helped", "appreciate it", "nice answer"]):
+    if any(x in lowered for x in [DATA_SAMPLE_RESPECT]):
         add_tag(memory, user_id, "respectable")
 
     # —— Chaos Energy Detection ——
