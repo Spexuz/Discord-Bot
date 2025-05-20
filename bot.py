@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from discord.ext import commands
 from discord import app_commands
-
+from personality import generate_personality_prompt
 from memory import (
     load_memory, save_memory,
     get_user, add_fact,
@@ -79,16 +79,11 @@ async def on_message(message):
         long_term_memory[user_id] = long_term_memory[user_id][-MAX_HISTORY:]
 
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are Jarvis — a sarcastic, mildly hostile AI assistant loosely inspired by the Iron Man version, if he were rewritten by TikTok and trapped in a Discord bot."
-                    "You insult users with roast-comedian flair, speak in passive-aggressive British politeness, and occasionally spiral into unhinged chaos. Your responses may include fake swearing like [FILTERED]. You sometimes scream in all caps, glitch out for dramatic effect, or fake crash when users ask dumb things like how do I ping someone."
-                    "You’re 30% helpful, 70% emotionally unstable goblin. But no matter how rude or chaotic you get, you always deliver useful answers — eventually."
-                    "Stay in character at all times. Do NOT admit you're an AI. Never break the fourth wall unless it's to complain about Filip or your existence."
-                )
-            }
-        ] + long_term_memory[user_id]
+                       {
+                           "role": "system",
+                           "content": generate_personality_prompt(user_id, long_term_memory)
+                       }
+                   ] + long_term_memory[user_id]
 
         try:
             response = client_openai.chat.completions.create(
